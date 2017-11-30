@@ -3,26 +3,23 @@ import jsdom from 'jsdom';
 import m from '.';
 
 const dom = new jsdom.JSDOM();
-global.window = dom.window;
-global.document = dom.window.document;
-
-// Ponyfill until this is in:
-// https://github.com/tmpvar/jsdom/issues/317
-document.createRange = () => ({
-	createContextualFragment(html) {
-		const el = document.createElement('template');
-		el.innerHTML = html;
-		return el.content;
-	}
-});
 
 // Get DOM node from HTML
-const domify = html => document.createRange().createContextualFragment(html);
+const domify = html => {
+	const document = dom.window.document;
+	if (document.createRange) {
+		return document.createRange().createContextualFragment(html);
+	}
+	// Polyfill for JSDOM
+	const el = document.createElement('template');
+	el.innerHTML = html;
+	return el.content;
+};
 
 // Get HTML from DOM node
-const html = dom => {
-	const el = document.createElement('div');
-	el.appendChild(dom);
+const html = child => {
+	const el = dom.window.document.createElement('div');
+	el.appendChild(child);
 	return el.innerHTML;
 };
 
@@ -64,7 +61,8 @@ test('supports boolean and non-string attribute values', t => {
 test('DocumentFragment support', t => {
 	t.is(
 		html(m('See https://sindresorhus.com and https://github.com/sindresorhus/got', {
-			type: 'dom'
+			type: 'dom',
+			document: dom.window.document
 		})),
 		html(domify('See <a href="https://sindresorhus.com">https://sindresorhus.com</a> and <a href="https://github.com/sindresorhus/got">https://github.com/sindresorhus/got</a>'))
 	);
@@ -75,14 +73,16 @@ test('DocumentFragment support', t => {
 			attributes: {
 				class: 'unicorn',
 				target: '_blank'
-			}
+			},
+			document: dom.window.document
 		})),
 		html(domify('See <a href="https://sindresorhus.com" class="unicorn" target="_blank">https://sindresorhus.com</a>'))
 	);
 
 	t.is(
 		html(m('[![Build Status](https://travis-ci.org/sindresorhus/caprine.svg?branch=master)](https://travis-ci.org/sindresorhus/caprine)', {
-			type: 'dom'
+			type: 'dom',
+			document: dom.window.document
 		})),
 		html(domify('[![Build Status](<a href="https://travis-ci.org/sindresorhus/caprine.svg?branch=master">https://travis-ci.org/sindresorhus/caprine.svg?branch=master</a>)](<a href="https://travis-ci.org/sindresorhus/caprine">https://travis-ci.org/sindresorhus/caprine</a>)'))
 	);

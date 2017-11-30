@@ -13,7 +13,15 @@ const linkify = (href, options) => createHtmlElement({
 });
 
 // Get DOM node from HTML
-const domify = html => document.createRange().createContextualFragment(html);
+const domify = (html, document) => {
+	if (document.createRange) {
+		return document.createRange().createContextualFragment(html);
+	}
+	// Polyfill for JSDOM
+	const el = document.createElement('template');
+	el.innerHTML = html;
+	return el.content;
+};
 
 const getAsString = (input, options) => {
 	return input.replace(urlRegex(), match => linkify(match, options));
@@ -22,19 +30,20 @@ const getAsString = (input, options) => {
 const getAsDocumentFragment = (input, options) => {
 	return input.split(urlRegex()).reduce((frag, text, index) => {
 		if (index % 2) { // URLs are always in odd positions
-			frag.appendChild(domify(linkify(text, options)));
+			frag.appendChild(domify(linkify(text, options), options.document));
 		} else if (text.length > 0) {
-			frag.appendChild(document.createTextNode(text));
+			frag.appendChild(options.document.createTextNode(text));
 		}
 
 		return frag;
-	}, document.createDocumentFragment());
+	}, options.document.createDocumentFragment());
 };
 
 module.exports = (input, options) => {
 	options = Object.assign({
 		attributes: {},
-		type: 'string'
+		type: 'string',
+		document: typeof document === 'undefined' ? undefined : document
 	}, options);
 
 	if (options.type === 'string') {
@@ -42,6 +51,9 @@ module.exports = (input, options) => {
 	}
 
 	if (options.type === 'dom') {
+		if (!options.document) {
+			throw new Error('Cannot return a document fragment unless you provide options.document');
+		}
 		return getAsDocumentFragment(input, options);
 	}
 
